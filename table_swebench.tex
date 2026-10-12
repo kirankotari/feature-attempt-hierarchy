@@ -1,0 +1,29 @@
+\begin{table*}[t]
+\centering
+\small
+\caption{Context Selection and Token Compression Performance on SWE-bench Trajectories across Budgets $B$.}
+\label{tab:swebench_results}
+\begin{tabular}{lcccccc}
+\toprule
+\textbf{Context Strategy} & \textbf{Budget $B$} & \textbf{Avg Tokens} & \textbf{Compression (\%)} & \textbf{Root Prompt} & \textbf{Active Errors} & \textbf{Superseded Pruned} \\
+\midrule
+\multicolumn{7}{l}{\textit{Token Budget $B = 100$ tokens}} \\
+  Full History (Uncompressed) & 100 & 180 & 0.0\% & 100.0\% & 100.0\% & 0.0\% \\
+  Sliding Suffix Window & 100 & 87 & 35.7\% & 33.3\% & 66.7\% & 66.7\% \\
+  Latest Error Shortcut & 100 & 70 & 46.0\% & 66.7\% & 66.7\% & 0.0\% \\
+  \textbf{Feature-Attempt Hierarchy (Ours)} & 100 & 42 & \textbf{64.1\%} & 100.0\% & \textbf{66.7\%} & \textbf{66.7\%} \\
+\midrule
+\multicolumn{7}{l}{\textit{Token Budget $B = 200$ tokens}} \\
+  Full History (Uncompressed) & 200 & 180 & 0.0\% & 100.0\% & 100.0\% & 0.0\% \\
+  Sliding Suffix Window & 200 & 101 & 25.1\% & 66.7\% & 66.7\% & 33.3\% \\
+  Latest Error Shortcut & 200 & 123 & 25.1\% & 100.0\% & 100.0\% & 0.0\% \\
+  \textbf{Feature-Attempt Hierarchy (Ours)} & 200 & 93 & \textbf{47.9\%} & 100.0\% & \textbf{100.0\%} & \textbf{33.3\%} \\
+\midrule
+\multicolumn{7}{l}{\textit{Token Budget $B = 400$ tokens}} \\
+  Full History (Uncompressed) & 400 & 180 & 0.0\% & 100.0\% & 100.0\% & 0.0\% \\
+  Sliding Suffix Window & 400 & 180 & 0.0\% & 100.0\% & 100.0\% & 0.0\% \\
+  Latest Error Shortcut & 400 & 123 & 25.1\% & 100.0\% & 100.0\% & 0.0\% \\
+  \textbf{Feature-Attempt Hierarchy (Ours)} & 400 & 93 & \textbf{47.9\%} & 100.0\% & \textbf{100.0\%} & \textbf{33.3\%} \\
+\bottomrule
+\end{tabular}
+\end{table*}
