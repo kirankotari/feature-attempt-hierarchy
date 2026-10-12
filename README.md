@@ -1,0 +1,134 @@
+# Feature-Attempt Hierarchies for Coding-Agent Context
+
+An agent context management and Token Economics FinOps engine for multi-turn software engineering agents (Kotari, 2026).
+
+---
+
+## Overview
+
+Multi-turn AI coding agents frequently fail during complex bug repairs when using traditional chronological sliding windows:
+* **The Failure Mode:** The sliding window spends its token budget on the newest tail of the trace (e.g. recent exploration detours, inspection commands, or superseded edits), which buries the original user constraints and older open failures that the agent still needs to fix.
+* **The Solution:** Treat agent history as a **Feature-Attempt Hierarchy**:
+  1. **Root:** The user's core feature task and constraints.
+  2. **Attempt Nodes:** Each edit bounded by a test execution opens an attempt; previous failed attempts are marked superseded.
+  3. **Issue Status:** Tool failures remain open until verified by successful test/compiler executions.
+  4. **Side Threads:** Detours and side conversations are isolated to separate branches.
+  5. **Algorithm 1:** Selects prompt context within a budget: newest open failure first, then the latest user instruction, then the causing edits, and finally foundational constraints.
+
+### Token Economics (Agent FinOps)
+The same hierarchy serves as an accurate **cost ledger**, decomposing total agent spend into three enterprise categories:
+* **Feature Cost:** Model calls advancing the primary task.
+* **Rework Cost:** The subset of feature spend occurring after the first test failure.
+* **Side Cost:** Model spend consumed by detached side threads and detours.
+
+---
+
+## Project Structure
+
+```text
+feature-attempt-hierarchy/
+├── src/
+│   ├── __init__.py           # Package exports
+│   ├── models.py             # Event, AttemptNode, HierarchyTree, TokenUsage
+│   ├── tokenizers.py         # Pluggable tokenizers (TiktokenTokenizer, RegexProxyTokenizer)
+│   ├── hierarchy.py          # HierarchyBuilder implementing BuildHierarchy(H)
+│   ├── selectors.py          # Algorithm 1 (FeatureAttemptSelector) & Baselines
+│   ├── ledger.py             # CostLedger Token Economics attribution engine
+│   ├── evaluator.py          # ContextGateChecker and benchmark harnesses
+│   └── swebench_adapter.py   # Online runtime adapter for SWE-bench & SWE-agent
+├── tests/
+│   ├── test_worked_catalog.py # Reproduces Section 4 Catalog trace [e01, e07, e09, e12]
+│   ├── test_comprehensive.py  # Evaluates baselines (Suffix Window, Latest Error, Fallback)
+│   └── test_swebench_adapter.py # Integration tests for SWE-bench trajectory conversion
+├── pyproject.toml
+└── requirements.txt
+```
+
+---
+
+## Quick Start
+
+### 1. Installation
+
+```bash
+pip install -e .
+```
+
+### 2. Context Selection with Algorithm 1
+
+```python
+from feature_attempt_hierarchy import (
+    Event, EventKind, FeatureAttemptSelector, RegexProxyTokenizer
+)
+
+events = [
+    Event("e01", 1, EventKind.USER, "implement catalog feature with caching"),
+    Event("e03", 3, EventKind.ASSISTANT_EDIT, "write initial implementation"),
+    Event("e04", 4, EventKind.TOOL_RESULT, "SyntaxError: unexpected EOF", exit_code=1),
+    Event("e06", 6, EventKind.TOOL_RESULT, "py_compile succeeded ok", exit_code=0),
+    Event("e07", 7, EventKind.ASSISTANT_EDIT, "add redis caching layer"),
+    Event("e09", 9, EventKind.TOOL_RESULT, "KeyError: 'title' on row", exit_code=1),
+    Event("e12", 12, EventKind.USER, "make sure cache gracefully falls back to memory"),
+]
+
+selector = FeatureAttemptSelector()
+result = selector.select(events, budget=320, tokenizer=RegexProxyTokenizer())
+
+# Output: ['e01', 'e07', 'e09', 'e12']
+print("Selected Context IDs:", result.selected_ids)
+```
+
+---
+
+## SWE-bench Runtime Integration
+
+To use with SWE-agent, OpenHands, or custom ReAct agent loops:
+
+```python
+from feature_attempt_hierarchy import SWEBenchContextManager, SWEBenchCostTracker
+
+# Initialize Context Manager with standard model tokenization
+manager = SWEBenchContextManager(token_budget=16000)
+
+# Inside your agent turn loop:
+trajectory_messages = [
+    {"role": "user", "content": "Django Issue #1234: ForeignKey on_delete validation crash."},
+    {"role": "assistant", "action": "edit", "content": "Updating models/fields.py..."},
+    {"role": "tool", "action_cmd": "pytest tests/", "exit_code": 1, "content": "FAILED: KeyError"},
+    {"role": "assistant", "thread_id": "side", "content": "Checking local git status..."},
+    {"role": "tool", "thread_id": "side", "content": "On branch main"},
+]
+
+# Prune context dynamically using Algorithm 1:
+pruned_messages = manager.select_prompt_messages(trajectory_messages, budget=8000)
+
+# Analyze Token Economics after task completion:
+tracker = SWEBenchCostTracker(p_in=2.0, p_out=8.0)
+report = tracker.analyze_trajectory(trajectory_messages)
+print(f"Feature Cost: ${report.feature_cost:.6f}")
+print(f"Rework Cost:  ${report.rework_cost:.6f}")
+print(f"Rework Ratio: {report.rework_ratio:.1%}")
+```
+
+---
+
+## Running Tests
+
+Run the complete test suite with Python unittest:
+
+```bash
+python3 -m unittest discover -s tests
+```
+
+---
+
+## Citation
+
+```bibtex
+@article{kotari2026hierarchies,
+  title={Feature-Attempt Hierarchies for Selecting Coding-Agent Context and Attributing Its Cost},
+  author={Kotari, Kiran Kumar},
+  journal={Working Draft},
+  year={2026}
+}
+```
