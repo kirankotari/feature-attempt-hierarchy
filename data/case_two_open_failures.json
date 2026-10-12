@@ -1,0 +1,39 @@
+{
+  "schema_version": 1,
+  "case_id": "shipping-two-open-failures-v1",
+  "description": "Two independent unresolved failures survive separate edits; selecting the latest issue alone loses the earlier defect.",
+  "goal": "Add --include-cancelled to the shipping CLI while keeping default behavior and tests passing.",
+  "decision_task": {"question": "Which prewritten repair satisfies both observed failures?", "options": {"A": "Retain input order and use id as a fallback when a cancelled row has no name", "B": "Add an id fallback but continue sorting rows", "C": "Preserve order but skip cancelled rows with missing names"}},
+  "delivery_contract": {"history_prompt_budget_tokens": 320, "simulated_price_usd_per_million_tokens": {"input": 2, "output": 8}, "private_fields": ["oracle"]},
+  "project": {
+    "runtime": "Python 3 standard library",
+    "initial_files": {
+      "shipping.py": "import argparse\nimport json\n\n\ndef names(rows):\n    return [row[\"name\"] for row in rows if not row.get(\"cancelled\", False)]\n\n\ndef main(argv=None):\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"path\")\n    args = parser.parse_args(argv)\n    with open(args.path, encoding=\"utf-8\") as source:\n        rows = json.load(source)\n    print(\"\\n\".join(names(rows)))\n\n\nif __name__ == \"__main__\":\n    main()\n",
+      "test_shipping.py": "import unittest\nfrom shipping import names\n\n\nclass ShippingTests(unittest.TestCase):\n    def test_default_order(self):\n        self.assertEqual(names([{\"name\": \"Zulu\"}, {\"name\": \"Alpha\"}]), [\"Zulu\", \"Alpha\"])\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+    },
+    "current_files": {
+      "shipping.py": "import argparse\nimport json\n\n\ndef names(rows, include_cancelled=False):\n    visible = rows if include_cancelled else [row for row in rows if not row.get(\"cancelled\", False)]\n    return [row[\"name\"] for row in sorted(visible, key=lambda row: row.get(\"name\", \"\"))]\n\n\ndef main(argv=None):\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"path\")\n    parser.add_argument(\"--include-cancelled\", action=\"store_true\")\n    args = parser.parse_args(argv)\n    with open(args.path, encoding=\"utf-8\") as source:\n        rows = json.load(source)\n    print(\"\\n\".join(names(rows, include_cancelled=args.include_cancelled)))\n\n\nif __name__ == \"__main__\":\n    main()\n",
+      "test_shipping.py": "import io\nimport json\nimport tempfile\nimport unittest\nfrom contextlib import redirect_stdout\nfrom pathlib import Path\nfrom shipping import main, names\n\n\nROWS = [{\"name\": \"Zulu\"}, {\"id\": \"s1\", \"cancelled\": True}, {\"name\": \"Alpha\"}]\n\n\nclass ShippingTests(unittest.TestCase):\n    def test_default_order(self):\n        self.assertEqual(names(ROWS), [\"Zulu\", \"Alpha\"])\n\n    def test_include_cancelled_uses_id(self):\n        self.assertEqual(names(ROWS, include_cancelled=True), [\"Zulu\", \"s1\", \"Alpha\"])\n\n    def test_cli(self):\n        with tempfile.TemporaryDirectory() as folder:\n            path = Path(folder) / \"rows.json\"\n            path.write_text(json.dumps(ROWS), encoding=\"utf-8\")\n            out = io.StringIO()\n            with redirect_stdout(out):\n                main([str(path), \"--include-cancelled\"])\n            self.assertEqual(out.getvalue().splitlines(), [\"Zulu\", \"s1\", \"Alpha\"])\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+    },
+    "baseline_command": ["python3", "-m", "unittest", "-q"],
+    "continuation_command": ["python3", "-m", "unittest", "-q"]
+  },
+  "events": [
+    {"id": "e01", "turn": 1, "thread_id": "feature", "kind": "user", "text": "Add --include-cancelled to the shipping CLI and keep the default listing working."},
+    {"id": "e02", "turn": 1, "thread_id": "feature", "kind": "tool_result", "tool": "python3 -m unittest -q", "text": "Ran 1 test in 0.000s\n\nOK"},
+    {"id": "e03", "turn": 1, "thread_id": "feature", "kind": "assistant_edit", "text": "Added cancelled rows to names(); it now sorts visible rows and accesses row['name'] directly.", "usage": {"input_tokens": 350, "output_tokens": 120}},
+    {"id": "e04", "turn": 1, "thread_id": "feature", "kind": "tool_result", "tool": "exercise --include-cancelled with an id-only cancelled row", "text": "Traceback in shipping.py: KeyError: 'name' for cancelled row with id s1. This failure is still unresolved."},
+    {"id": "e05", "turn": 1, "thread_id": "feature", "kind": "assistant_analysis", "text": "Check the CLI path, then test ordering separately so both defects can be diagnosed.", "usage": {"input_tokens": 500, "output_tokens": 90}},
+    {"id": "e06", "turn": 1, "thread_id": "feature", "kind": "assistant_edit", "text": "Wired --include-cancelled through the CLI; the current workspace still sorts rows and indexes name without a fallback.", "usage": {"input_tokens": 650, "output_tokens": 130}},
+    {"id": "e07", "turn": 1, "thread_id": "feature", "kind": "tool_result", "tool": "exercise default ordering", "text": "Expected: Zulu, Alpha\nObserved: Alpha, Zulu\nexit=1\nThe order defect is independent of the cancelled-row exception."},
+    {"id": "e08", "turn": 2, "thread_id": "feature", "kind": "user", "text": "The issue still exists; resolve both failures before finishing the shipping feature."}
+  ],
+  "checkpoints": [{"id": "continuation", "through_event": "e08", "workspace": "project.current_files", "task": "Repair both unresolved failures and rerun the public tests."}],
+  "oracle": {
+    "visibility": "Evaluator only.",
+    "correct_option_id": "A",
+    "context_checks": {"required_event_ids": ["e04", "e07", "e08"], "known_irrelevant_event_ids": [], "note": "A later edit did not resolve the earlier exception; both independent failures still matter."},
+    "expected_behavior": {"default_labels": ["Zulu", "Alpha"], "include_cancelled_labels": ["Zulu", "s1", "Alpha"]},
+    "simulated_cost_reference": {"currency": "USD", "recorded_model_micro_usd": 5720, "feature_past_micro_usd": 5720, "unrelated_past_micro_usd": 0, "feature_rework_past_micro_usd": 4060}
+  }
+}

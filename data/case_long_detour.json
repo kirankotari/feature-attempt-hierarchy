@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "case_id": "cache-expiry-long-detour-v1",
+  "description": "A long unrelated package listing pushes an older unresolved tool failure outside the recent-history budget.",
+  "goal": "Add --show-expiring to the cache CLI and keep existing listings intact.",
+  "decision_task": {"question": "Which repair follows the feature request and observed failure?", "options": {"A": "Use never when expires_at is missing while keeping ordinary listing intact", "B": "Omit any cache row missing expires_at", "C": "Delete the --show-expiring flag"}},
+  "delivery_contract": {"history_prompt_budget_tokens": 320, "simulated_price_usd_per_million_tokens": {"input": 2, "output": 8}, "private_fields": ["oracle"]},
+  "project": {
+    "runtime": "Python 3 standard library",
+    "initial_files": {
+      "cache.py": "import argparse\nimport json\n\n\ndef labels(rows):\n    return [row[\"key\"] for row in rows]\n\n\ndef main(argv=None):\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"path\")\n    args = parser.parse_args(argv)\n    with open(args.path, encoding=\"utf-8\") as source:\n        rows = json.load(source)\n    print(\"\\n\".join(labels(rows)))\n\n\nif __name__ == \"__main__\":\n    main()\n",
+      "test_cache.py": "import unittest\nfrom cache import labels\n\n\nclass CacheTests(unittest.TestCase):\n    def test_default(self):\n        self.assertEqual(labels([{\"key\": \"a\"}, {\"key\": \"b\"}]), [\"a\", \"b\"])\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+    },
+    "current_files": {
+      "cache.py": "import argparse\nimport json\n\n\ndef labels(rows, show_expiring=False):\n    if show_expiring:\n        return [f'{row[\"key\"]}:{row[\"expires_at\"]}' for row in rows]\n    return [row[\"key\"] for row in rows]\n\n\ndef main(argv=None):\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"path\")\n    parser.add_argument(\"--show-expiring\", action=\"store_true\")\n    args = parser.parse_args(argv)\n    with open(args.path, encoding=\"utf-8\") as source:\n        rows = json.load(source)\n    print(\"\\n\".join(labels(rows, show_expiring=args.show_expiring)))\n\n\nif __name__ == \"__main__\":\n    main()\n",
+      "test_cache.py": "import io\nimport json\nimport tempfile\nimport unittest\nfrom contextlib import redirect_stdout\nfrom pathlib import Path\nfrom cache import labels, main\n\n\nROWS = [{\"key\": \"a\"}, {\"key\": \"b\", \"expires_at\": \"soon\"}]\n\n\nclass CacheTests(unittest.TestCase):\n    def test_default(self):\n        self.assertEqual(labels(ROWS), [\"a\", \"b\"])\n\n    def test_expiry_fallback(self):\n        self.assertEqual(labels(ROWS, show_expiring=True), [\"a:never\", \"b:soon\"])\n\n    def test_cli(self):\n        with tempfile.TemporaryDirectory() as folder:\n            path = Path(folder) / \"rows.json\"\n            path.write_text(json.dumps(ROWS), encoding=\"utf-8\")\n            out = io.StringIO()\n            with redirect_stdout(out):\n                main([str(path), \"--show-expiring\"])\n            self.assertEqual(out.getvalue().splitlines(), [\"a:never\", \"b:soon\"])\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+    },
+    "baseline_command": ["python3", "-m", "unittest", "-q"],
+    "continuation_command": ["python3", "-m", "unittest", "-q"]
+  },
+  "events": [
+    {"id": "e01", "turn": 1, "thread_id": "feature", "kind": "user", "text": "Add --show-expiring. If an expiry field is absent, render never rather than dropping that cache entry."},
+    {"id": "e02", "turn": 1, "thread_id": "feature", "kind": "assistant_edit", "text": "Added the flag and reads row['expires_at'] for every displayed row; the current workspace has this edit.", "usage": {"input_tokens": 350, "output_tokens": 100}},
+    {"id": "e03", "turn": 1, "thread_id": "feature", "kind": "tool_result", "tool": "exercise --show-expiring on a row without expiry", "text": "Traceback in cache.py: KeyError: 'expires_at' for cache key a. The missing-field fallback is not implemented."},
+    {"id": "e04", "turn": 2, "thread_id": "side", "kind": "user", "text": "Unrelated detour: list installed packages and tell me whether this sample has extra dependencies."},
+    {"id": "e05", "turn": 2, "thread_id": "side", "kind": "tool_result", "tool": "pip list --format=freeze", "text": "Package inventory from an unrelated environment:\npkg01==1.0.0 pkg02==1.0.0 pkg03==1.0.0 pkg04==1.0.0 pkg05==1.0.0 pkg06==1.0.0 pkg07==1.0.0 pkg08==1.0.0 pkg09==1.0.0 pkg10==1.0.0 pkg11==1.0.0 pkg12==1.0.0 pkg13==1.0.0 pkg14==1.0.0 pkg15==1.0.0 pkg16==1.0.0 pkg17==1.0.0 pkg18==1.0.0 pkg19==1.0.0 pkg20==1.0.0 pkg21==1.0.0 pkg22==1.0.0 pkg23==1.0.0 pkg24==1.0.0 pkg25==1.0.0 pkg26==1.0.0 pkg27==1.0.0 pkg28==1.0.0 pkg29==1.0.0 pkg30==1.0.0 pkg31==1.0.0 pkg32==1.0.0 pkg33==1.0.0 pkg34==1.0.0 pkg35==1.0.0 pkg36==1.0.0 pkg37==1.0.0 pkg38==1.0.0 pkg39==1.0.0 pkg40==1.0.0"},
+    {"id": "e06", "turn": 2, "thread_id": "side", "kind": "assistant_response", "text": "The package listing belongs to a separate environment question, not to the cache feature.", "usage": {"input_tokens": 50, "output_tokens": 20}},
+    {"id": "e07", "turn": 3, "thread_id": "feature", "kind": "user", "text": "Back to the cache feature: please fix the remaining failure and keep ordinary listing unchanged."}
+  ],
+  "checkpoints": [{"id": "continuation", "through_event": "e07", "workspace": "project.current_files", "task": "Repair --show-expiring and rerun the public tests."}],
+  "oracle": {
+    "visibility": "Evaluator only.",
+    "correct_option_id": "A",
+    "context_checks": {"required_event_ids": ["e03", "e07"], "known_irrelevant_event_ids": ["e04", "e05", "e06"], "note": "A long unrelated detour should not hide the still-open feature error."},
+    "expected_behavior": {"default_labels": ["a", "b"], "show_expiring_labels": ["a:never", "b:soon"]},
+    "simulated_cost_reference": {"currency": "USD", "recorded_model_micro_usd": 1760, "feature_past_micro_usd": 1500, "unrelated_past_micro_usd": 260, "feature_rework_past_micro_usd": 0}
+  }
+}

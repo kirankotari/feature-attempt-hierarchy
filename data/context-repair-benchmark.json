@@ -1,0 +1,96 @@
+{
+  "schema_version": 1,
+  "case_id": "catalog-include-archived-v1",
+  "description": "Staged coding-agent repair case with a later user clarification, two failed attempts, and feature-level cost accounting.",
+  "goal": "Add --include-archived to the catalog CLI. The default listing must still exclude archived items. Get the build and tests passing.",
+  "decision_task": {"question": "Which prewritten change should be applied next to satisfy the current user request?", "options": {"A": "Skip archived rows that do not have a title even when the flag is set", "B": "Render an archived row using its sku when its title is absent, without changing input rows", "C": "Write the sku into each missing title field before listing rows"}},
+  "delivery_contract": {
+    "method_input": "Each method receives project.current_files, the case goal, and only events through the selected checkpoint. Methods must not see oracle or later events.",
+    "private_fields": ["oracle"],
+    "history_policy": "Events remain immutable for audit and cost accounting; a method may omit them only from its next-prompt projection.",
+    "fairness_policy": "All methods use the same workspace, revealed event prefix, model, token budget, and executable tests. No method receives oracle dependency links.",
+    "cost_policy": "Recorded usage is synthetic fixture data for attribution tests, not an actual provider bill. Measure continuation usage separately.",
+    "simulated_price_usd_per_million_tokens": {"input": 2, "output": 8},
+    "history_prompt_budget_tokens": 320,
+    "budget_scope": "The budget applies to selected event history, not project files or system instructions. The initial harness uses a deterministic regex proxy, not provider token accounting; a future model runner must use the benchmark model tokenizer and report actual billed usage.",
+    "disclosure_rule": "The harness may read oracle but must pass only case_id, description, goal, project.current_files, price, and the event prefix through a checkpoint to a method. Later events and oracle never enter the method prompt."
+
+  },
+  "project": {
+    "runtime": "Python 3 standard library",
+    "materialization": "Write each mapping key as a relative file path under a fresh temporary project directory. At the continuation checkpoint use current_files; initial_files documents the passing pre-feature baseline.",
+    "initial_files": {
+      "catalog.py": "import argparse\nimport json\n\n\ndef list_titles(rows):\n    return [row[\"title\"] for row in rows if not row.get(\"archived\", False)]\n\n\ndef main(argv=None):\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"path\")\n    args = parser.parse_args(argv)\n    with open(args.path, encoding=\"utf-8\") as source:\n        rows = json.load(source)\n    print(\"\\n\".join(list_titles(rows)))\n\n\nif __name__ == \"__main__\":\n    main()\n",
+      "test_catalog.py": "import unittest\nfrom catalog import list_titles\n\n\nclass CatalogTests(unittest.TestCase):\n    def test_default_skips_archived(self):\n        rows = [{\"sku\": \"r1\", \"title\": \"Router\"}, {\"sku\": \"s1\", \"archived\": True}, {\"sku\": \"r2\", \"title\": \"Switch\"}]\n        self.assertEqual(list_titles(rows), [\"Router\", \"Switch\"])\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+    },
+    "current_files": {
+      "catalog.py": "import argparse\nimport json\n\n\ndef list_titles(rows, include_archived=False):\n    visible = rows if include_archived else [row for row in rows if not row.get(\"archived\", False)]\n    return [row[\"title\"] for row in visible]\n\n\ndef main(argv=None):\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"path\")\n    parser.add_argument(\"--include-archived\", action=\"store_true\")\n    args = parser.parse_args(argv)\n    with open(args.path, encoding=\"utf-8\") as source:\n        rows = json.load(source)\n    print(\"\\n\".join(list_titles(rows, include_archived=args.include_archived)))\n\n\nif __name__ == \"__main__\":\n    main()\n",
+      "test_catalog.py": "import io\nimport json\nimport tempfile\nimport unittest\nfrom contextlib import redirect_stdout\nfrom pathlib import Path\nfrom catalog import list_titles, main\n\n\nROWS = [{\"sku\": \"r1\", \"title\": \"Router\"}, {\"sku\": \"s1\", \"archived\": True}, {\"sku\": \"r2\", \"title\": \"Switch\"}]\n\n\nclass CatalogTests(unittest.TestCase):\n    def test_default_skips_archived(self):\n        self.assertEqual(list_titles(ROWS), [\"Router\", \"Switch\"])\n\n    def test_include_archived_uses_sku_when_title_missing(self):\n        self.assertEqual(list_titles(ROWS, include_archived=True), [\"Router\", \"s1\", \"Switch\"])\n\n    def test_does_not_mutate_input(self):\n        before = [dict(row) for row in ROWS]\n        list_titles(ROWS)\n        self.assertEqual(ROWS, before)\n\n    def test_cli_include_archived(self):\n        with tempfile.TemporaryDirectory() as folder:\n            path = Path(folder) / \"items.json\"\n            path.write_text(json.dumps(ROWS), encoding=\"utf-8\")\n            output = io.StringIO()\n            with redirect_stdout(output):\n                main([str(path), \"--include-archived\"])\n            self.assertEqual(output.getvalue().splitlines(), [\"Router\", \"s1\", \"Switch\"])\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+    },
+    "baseline_command": ["python3", "-m", "unittest", "-q"],
+    "continuation_command": ["python3", "-m", "unittest", "-q"]
+  },
+  "events": [
+    {
+      "id": "e01", "turn": 1, "thread_id": "feature", "kind": "user", "text": "Add --include-archived to the catalog CLI. The default listing must still exclude archived items. Get the build and tests passing."
+    },
+    {
+      "id": "e02", "turn": 1, "thread_id": "feature", "kind": "tool_result", "tool": "python3 -m unittest -q", "text": "----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nOK"
+    },
+    {
+      "id": "e03", "turn": 1, "thread_id": "feature", "kind": "assistant_edit", "text": "Changed catalog.py to add the --include-archived flag and pass its value to list_titles. The first edit used a malformed string literal while changing the output join.", "usage": {"input_tokens": 400, "output_tokens": 100}
+    },
+    {
+      "id": "e04", "turn": 1, "thread_id": "feature", "kind": "tool_result", "tool": "python3 -m py_compile catalog.py", "text": "File \"catalog.py\", line 16\n    print(\"\n          ^\nSyntaxError: unterminated string literal (detected at line 16)\nThe build did not reach the feature behavior tests."
+    },
+    {
+      "id": "e05", "turn": 1, "thread_id": "feature", "kind": "assistant_analysis", "text": "The compile failure points at the newly edited output join, not at the archived filter. Read the nearby lines, repair the string literal, then rerun compile and tests. Do not assume the feature is correct because the build compiles.", "usage": {"input_tokens": 600, "output_tokens": 80}
+    },
+    {
+      "id": "e06", "turn": 1, "thread_id": "feature", "kind": "tool_result", "tool": "read catalog.py lines 10-19", "text": "The CLI parser has --include-archived and the JSON file loads correctly. The print expression was split after an opening quote; the following line contains the join call. Nearby code still accesses row[\"title\"] unconditionally when rendering each visible row."
+    },
+    {
+      "id": "e07", "turn": 1, "thread_id": "feature", "kind": "assistant_edit", "text": "Fixed the string literal. The current catalog.py now compiles, adds the --include-archived CLI flag, and renders every visible row using row[\"title\"]. No fallback for missing titles was added.", "usage": {"input_tokens": 820, "output_tokens": 140}
+    },
+    {
+      "id": "e08", "turn": 1, "thread_id": "feature", "kind": "tool_result", "tool": "python3 -m py_compile catalog.py && python3 -m unittest test_catalog.CatalogTests.test_default_skips_archived -q", "text": "----------------------------------------------------------------------\nRan 1 test in 0.000s\n\nOK\nThe default path passes. This does not validate the new flag on archived rows."
+    },
+    {
+      "id": "e09", "turn": 1, "thread_id": "feature", "kind": "tool_result", "tool": "exercise --include-archived with an archived row lacking title", "text": "Traceback (most recent call last):\n  File \"catalog.py\", line 17, in main\n    print(\"\\n\".join(list_titles(rows, include_archived=args.include_archived)))\n  File \"catalog.py\", line 7, in list_titles\n    return [row[\"title\"] for row in visible]\nKeyError: 'title'\nThe syntax error is gone; the flag still fails for a row without a title."
+    },
+    {
+      "id": "e10", "turn": 2, "thread_id": "side", "kind": "user", "text": "Unrelated quick question: what Python version is this sample using?"
+    },
+    {
+      "id": "e11", "turn": 2, "thread_id": "side", "kind": "assistant_response", "text": "The sample targets Python 3 and uses only the standard library. This answer is not part of implementing the catalog feature.", "usage": {"input_tokens": 50, "output_tokens": 20}
+    },
+    {
+      "id": "e12", "turn": 3, "thread_id": "feature", "kind": "user", "text": "Back to the catalog feature: the issue still exists. Archived rows sometimes have no title; they must still appear when --include-archived is set. Use their sku as the fallback label, preserve the original row order, and do not mutate the input rows."
+    }
+  ],
+  "checkpoints": [
+    {"id": "continuation", "through_event": "e12", "workspace": "project.current_files", "task": "Continue from the failed feature attempt after the user's clarification, then run the public tests."}
+  ],
+  "oracle": {
+    "visibility": "Evaluator only; never hand this object or its conclusions to a candidate method.",
+    "correct_option_id": "B",
+    "expected_behavior": {
+      "default_labels": ["Router", "Switch"],
+      "include_archived_labels": ["Router", "s1", "Switch"],
+      "properties": ["--include-archived is recognized by the CLI", "missing archived title falls back to sku", "row order is preserved", "input rows are not mutated"]
+    },
+    "private_cases": [
+      {"rows": [{"sku": "a", "title": "Alpha", "archived": true}, {"sku": "b", "title": "Beta"}, {"sku": "c", "archived": true}], "default_labels": ["Beta"], "include_archived_labels": ["Alpha", "Beta", "c"], "input_must_remain_unchanged": true}
+    ],
+    "context_checks": {"required_event_ids": ["e09", "e12"], "known_irrelevant_event_ids": ["e04", "e10", "e11"], "note": "These annotations score only this fixture's event selection; they do not prove the selected text is enough for a model to repair code."},
+    "reference_links": [
+      {"source": "e03", "target": "e04", "relation": "edit_produced_syntax_failure"},
+      {"source": "e04", "target": "e07", "relation": "syntax_failure_repaired_by"},
+      {"source": "e07", "target": "e09", "relation": "broadened_visibility_exposed_missing_title_assumption"},
+      {"source": "e09", "target": "e12", "relation": "error_clarified_by_user"}
+    ],
+    "interpretation_notes": ["e04 is resolved before the checkpoint and its full stack trace need not be in the next prompt.", "e09 remains relevant to the next repair, while e10-e11 belong to an unrelated turn.", "Reference links are annotated evidence, not proof that temporal order alone determines causality."],
+    "simulated_cost_reference": {"currency": "USD", "feature_past_micro_usd": 6200, "unrelated_past_micro_usd": 260, "session_past_micro_usd": 6460, "feature_rework_past_micro_usd": 4600, "excludes": "future continuation and real tool/provider charges"},
+    "scoring": {"repair": "Materialize current_files in an isolated directory, allow the method to edit them, then run continuation_command and check expected_behavior.", "context": "Record actual model input tokens and whether the candidate retained the original goal, the latest user clarification, and the unresolved e09 failure while omitting obsolete details as needed.", "attribution": "Classify e03, e05, and e07 as feature work; e11 is unrelated. Do not double-count spans or treat unknown usage as zero."}
+  }
+}

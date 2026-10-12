@@ -1,0 +1,48 @@
+{
+  "schema_version": 1,
+  "case_id": "refund-sign-position-v1",
+  "description": "A formatter edit compiles after an early syntax fix, but a later expectation mismatch remains and is followed by an unrelated turn.",
+  "goal": "Add --refund to the amount CLI while keeping ordinary amounts unchanged and tests passing.",
+  "decision_task": {"question": "Which prewritten change should be applied next to satisfy the current user request?", "options": {"A": "For refunds, place the minus sign before the dollar sign; leave ordinary amounts unchanged", "B": "Keep the dollar sign before the minus sign for refunds", "C": "Make both refunds and ordinary amounts negative"}},
+  "delivery_contract": {
+    "history_prompt_budget_tokens": 320,
+    "simulated_price_usd_per_million_tokens": {"input": 2, "output": 8},
+    "private_fields": ["oracle"],
+    "method_input": "Each selector receives the current workspace, goal and event prefix through the checkpoint, never oracle or future events.",
+    "fairness_policy": "Each selector receives the same workspace and the same 320-unit history budget; output is canonicalized before scoring.",
+    "budget_scope": "Only history uses the regex proxy budget; no real provider tokens or billed costs are measured."
+  },
+  "project": {
+    "runtime": "Python 3 standard library",
+    "initial_files": {
+      "amount.py": "import argparse\nfrom decimal import Decimal\n\n\ndef format_amount(cents):\n    return f\"${Decimal(cents) / 100:.2f}\"\n\n\ndef main(argv=None):\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"cents\", type=int)\n    args = parser.parse_args(argv)\n    print(format_amount(args.cents))\n\n\nif __name__ == \"__main__\":\n    main()\n",
+      "test_amount.py": "import unittest\nfrom amount import format_amount\n\n\nclass AmountTests(unittest.TestCase):\n    def test_regular(self):\n        self.assertEqual(format_amount(125), \"$1.25\")\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+    },
+    "current_files": {
+      "amount.py": "import argparse\nfrom decimal import Decimal\n\n\ndef format_amount(cents, refund=False):\n    value = Decimal(cents) / 100\n    if refund:\n        value = -value\n    return f\"${value:.2f}\"\n\n\ndef main(argv=None):\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"cents\", type=int)\n    parser.add_argument(\"--refund\", action=\"store_true\")\n    args = parser.parse_args(argv)\n    print(format_amount(args.cents, refund=args.refund))\n\n\nif __name__ == \"__main__\":\n    main()\n",
+      "test_amount.py": "import io\nimport unittest\nfrom contextlib import redirect_stdout\nfrom amount import format_amount, main\n\n\nclass AmountTests(unittest.TestCase):\n    def test_regular(self):\n        self.assertEqual(format_amount(125), \"$1.25\")\n\n    def test_refund(self):\n        self.assertEqual(format_amount(125, refund=True), \"-$1.25\")\n\n    def test_cli_refund(self):\n        output = io.StringIO()\n        with redirect_stdout(output):\n            main([\"125\", \"--refund\"])\n        self.assertEqual(output.getvalue().strip(), \"-$1.25\")\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+    },
+    "baseline_command": ["python3", "-m", "unittest", "-q"],
+    "continuation_command": ["python3", "-m", "unittest", "-q"]
+  },
+  "events": [
+    {"id": "e01", "turn": 1, "thread_id": "feature", "kind": "user", "text": "Add --refund to the amount CLI while keeping ordinary amounts unchanged and tests passing."},
+    {"id": "e02", "turn": 1, "thread_id": "feature", "kind": "tool_result", "tool": "python3 -m unittest -q", "text": "Ran 1 test in 0.000s\n\nOK"},
+    {"id": "e03", "turn": 1, "thread_id": "feature", "kind": "assistant_edit", "text": "Added a refund flag and a new f-string to format negative values. The first version accidentally left the string open.", "usage": {"input_tokens": 400, "output_tokens": 100}},
+    {"id": "e04", "turn": 1, "thread_id": "feature", "kind": "tool_result", "tool": "python3 -m py_compile amount.py", "text": "SyntaxError: unterminated f-string on the newly edited line. The behavioral check never ran."},
+    {"id": "e05", "turn": 1, "thread_id": "feature", "kind": "assistant_edit", "text": "Corrected the syntax. The program now compiles and formats refund amounts by negating the value before rendering a dollar-prefixed string. The code in current_files is this revision.", "usage": {"input_tokens": 700, "output_tokens": 120}},
+    {"id": "e06", "turn": 1, "thread_id": "feature", "kind": "tool_result", "tool": "python3 -m py_compile amount.py && python3 -m unittest test_amount.AmountTests.test_regular -q", "text": "Ran 1 test in 0.000s\n\nOK. Regular amounts still work; refund formatting was not checked."},
+    {"id": "e07", "turn": 1, "thread_id": "feature", "kind": "tool_result", "tool": "exercise --refund with 125 cents", "text": "Expected: -$1.25\nObserved: $-1.25\nexit=1\nThe command completed, but its rendered value does not match the requested format."},
+    {"id": "e08", "turn": 2, "thread_id": "side", "kind": "user", "text": "Unrelated question: does this sample use third-party dependencies?"},
+    {"id": "e09", "turn": 2, "thread_id": "side", "kind": "assistant_response", "text": "No, this sample uses the Python standard library. This answer is unrelated to the refund feature.", "usage": {"input_tokens": 50, "output_tokens": 20}},
+    {"id": "e10", "turn": 3, "thread_id": "feature", "kind": "user", "text": "Back to the refund feature: the rendered amount is still wrong. For refunds the minus sign must appear before the dollar sign: -$1.25, not $-1.25. Do not change ordinary amounts."}
+  ],
+  "checkpoints": [{"id": "continuation", "through_event": "e10", "workspace": "project.current_files", "task": "Correct the refund output without breaking positive amounts, then run the public tests."}],
+  "oracle": {
+    "visibility": "Evaluator only; do not expose this object to selectors.",
+    "correct_option_id": "A",
+    "context_checks": {"required_event_ids": ["e07", "e10"], "known_irrelevant_event_ids": ["e04", "e08", "e09"], "note": "The unresolved mismatch is e07 even though it has no traceback or Error keyword."},
+    "expected_behavior": {"regular_125": "$1.25", "refund_125": "-$1.25", "refund_305": "-$3.05"},
+    "simulated_cost_reference": {"currency": "USD", "recorded_model_micro_usd": 4220, "feature_past_micro_usd": 3960, "unrelated_past_micro_usd": 260, "feature_rework_past_micro_usd": 2360, "excludes": "tool, future continuation, and real provider costs"}
+  }
+}

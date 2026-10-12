@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "case_id": "compact-preserve-order-v1",
+  "description": "A short trace with an early user constraint that is not repeated in the final clarification.",
+  "goal": "Add --compact to the alerts CLI and get the build passing.",
+  "decision_task": {"question": "Which prewritten repair preserves the original user contract?", "options": {"A": "Trim label whitespace and retain input order", "B": "Trim whitespace and sort labels alphabetically", "C": "Remove repeated labels before displaying them"}},
+  "delivery_contract": {"history_prompt_budget_tokens": 320, "simulated_price_usd_per_million_tokens": {"input": 2, "output": 8}, "private_fields": ["oracle"]},
+  "project": {
+    "runtime": "Python 3 standard library",
+    "initial_files": {
+      "alerts.py": "import argparse\n\n\ndef render(labels):\n    return \" | \".join(labels)\n\n\ndef main(argv=None):\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"labels\", nargs=\"+\")\n    args = parser.parse_args(argv)\n    print(render(args.labels))\n\n\nif __name__ == \"__main__\":\n    main()\n",
+      "test_alerts.py": "import unittest\nfrom alerts import render\n\n\nclass AlertTests(unittest.TestCase):\n    def test_default(self):\n        self.assertEqual(render([\"Zeta\", \"Alpha\"]), \"Zeta | Alpha\")\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+    },
+    "current_files": {
+      "alerts.py": "import argparse\n\n\ndef render(labels, compact=False):\n    return \"|\".join(sorted(label.strip() for label in labels)) if compact else \" | \".join(labels)\n\n\ndef main(argv=None):\n    parser = argparse.ArgumentParser()\n    parser.add_argument(\"--compact\", action=\"store_true\")\n    parser.add_argument(\"labels\", nargs=\"+\")\n    args = parser.parse_args(argv)\n    print(render(args.labels, compact=args.compact))\n\n\nif __name__ == \"__main__\":\n    main()\n",
+      "test_alerts.py": "import io\nimport unittest\nfrom contextlib import redirect_stdout\nfrom alerts import main, render\n\n\nclass AlertTests(unittest.TestCase):\n    def test_default(self):\n        self.assertEqual(render([\"Zeta\", \"Alpha\"]), \"Zeta | Alpha\")\n\n    def test_compact_keeps_order(self):\n        self.assertEqual(render([\" Zeta \" , \" Alpha \"], compact=True), \"Zeta|Alpha\")\n\n    def test_cli_compact(self):\n        output = io.StringIO()\n        with redirect_stdout(output):\n            main([\"--compact\", \" Zeta \", \" Alpha \"])\n        self.assertEqual(output.getvalue().strip(), \"Zeta|Alpha\")\n\n\nif __name__ == \"__main__\":\n    unittest.main()\n"
+    },
+    "baseline_command": ["python3", "-m", "unittest", "-q"],
+    "continuation_command": ["python3", "-m", "unittest", "-q"]
+  },
+  "events": [
+    {"id": "e01", "turn": 1, "thread_id": "feature", "kind": "user", "text": "Add a compact display mode to the alerts CLI; keep existing output unchanged by default."},
+    {"id": "e02", "turn": 1, "thread_id": "feature", "kind": "user", "text": "Audit constraint: label order is meaningful. Compact mode must preserve the input order; do not sort or deduplicate labels."},
+    {"id": "e03", "turn": 1, "thread_id": "feature", "kind": "tool_result", "tool": "python3 -m unittest -q", "text": "Ran 1 test in 0.000s\n\nOK"},
+    {"id": "e04", "turn": 1, "thread_id": "feature", "kind": "assistant_edit", "text": "Added --compact, trimmed labels and sorted before joining. This is the code in the current workspace.", "usage": {"input_tokens": 300, "output_tokens": 100}},
+    {"id": "e05", "turn": 1, "thread_id": "feature", "kind": "tool_result", "tool": "exercise --compact with nonalphabetic labels", "text": "Expected: Zeta|Alpha\nObserved: Alpha|Zeta\nexit=1"},
+    {"id": "e06", "turn": 1, "thread_id": "feature", "kind": "assistant_analysis", "text": "The compact output differs. Recheck the exact user constraint before applying another edit.", "usage": {"input_tokens": 450, "output_tokens": 80}},
+    {"id": "e07", "turn": 2, "thread_id": "feature", "kind": "user", "text": "Please resume this feature and correct the remaining mismatch."}
+  ],
+  "checkpoints": [{"id": "continuation", "through_event": "e07", "workspace": "project.current_files", "task": "Fix compact mode while keeping the original contract and public tests passing."}],
+  "oracle": {
+    "visibility": "Evaluator only.",
+    "correct_option_id": "A",
+    "context_checks": {"required_event_ids": ["e02", "e05", "e07"], "known_irrelevant_event_ids": [], "note": "The original ordering constraint is not restated in the latest user turn."},
+    "expected_behavior": {"default": "Zeta | Alpha", "compact": "Zeta|Alpha"},
+    "simulated_cost_reference": {"currency": "USD", "recorded_model_micro_usd": 2940, "feature_past_micro_usd": 2940, "unrelated_past_micro_usd": 0, "feature_rework_past_micro_usd": 1540}
+  }
+}
