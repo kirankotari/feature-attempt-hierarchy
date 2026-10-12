@@ -30,6 +30,10 @@ import argparse
 from dataclasses import dataclass, field, asdict
 from typing import List, Dict, Any, Optional, Tuple
 
+from rich.console import Console
+from rich.table import Table
+from rich import box
+
 # Ensure package modules can be imported
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "src")))
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "src")))
@@ -414,6 +418,99 @@ class SWEBenchEvaluator:
             )
         return "\n".join(lines)
 
+    @staticmethod
+    def _pct_cell(value: float) -> str:
+        """Color a percentage green/yellow/red so higher-is-better reads at a glance."""
+        if value >= 99.95:
+            return f"[green]{value:.1f}%[/]"
+        if value <= 0.05:
+            return f"[dim red]{value:.1f}%[/]"
+        return f"[yellow]{value:.1f}%[/]"
+
+    def build_retention_table(self, results: List[TrajectoryEvaluationResult]) -> Table:
+        """Render Table 1 as a styled rich table for the terminal."""
+        table = Table(
+            title="Context Retention & Compression Performance \u2014 SWE-bench",
+            title_style="bold cyan",
+            caption="Averaged across Django, Sympy & Flask trajectories \u00b7 higher is better",
+            caption_style="dim italic",
+            box=box.ROUNDED,
+            header_style="bold white on grey23",
+            pad_edge=False,
+        )
+        table.add_column("Strategy", justify="left", no_wrap=True)
+        table.add_column("Budget", justify="right")
+        table.add_column("Avg Tok", justify="right")
+        table.add_column("Savings", justify="right")
+        table.add_column("Root", justify="right")
+        table.add_column("Active", justify="right")
+        table.add_column("Pruned", justify="right")
+
+        budgets = sorted({r.budget for r in results})
+        strategies = list(self.strategies.keys())
+
+        for bi, b in enumerate(budgets):
+            for s in strategies:
+                sub = [r for r in results if r.budget == b and r.strategy == s]
+                if not sub:
+                    continue
+                avg_tok = int(round(sum(r.retained_tokens for r in sub) / len(sub)))
+                avg_comp = round(sum(r.compression_ratio_pct for r in sub) / len(sub), 1)
+                root_kept = round(sum(100.0 if r.retained_root_prompt else 0.0 for r in sub) / len(sub), 1)
+                active_kept = round(sum(r.retained_active_issues_pct for r in sub) / len(sub), 1)
+                sup_pruned = round(sum(r.pruned_superseded_pct for r in sub) / len(sub), 1)
+
+                is_ours = "Ours" in s
+                name = f"[bold cyan]{s}[/]" if is_ours else s
+                table.add_row(
+                    name,
+                    f"{b:,}",
+                    f"{avg_tok:,}",
+                    self._pct_cell(avg_comp),
+                    self._pct_cell(root_kept),
+                    self._pct_cell(active_kept),
+                    self._pct_cell(sup_pruned),
+                    style="bold" if is_ours else None,
+                )
+            if bi < len(budgets) - 1:
+                table.add_section()
+        return table
+
+    def build_finops_table(self, results: List[TrajectoryEvaluationResult]) -> Table:
+        """Render Table 2 (token economics) as a styled rich table for the terminal."""
+        table = Table(
+            title="Token Economics \u2014 FinOps Ledger (Kotari, 2026)",
+            title_style="bold green",
+            box=box.ROUNDED,
+            header_style="bold white on grey23",
+            pad_edge=False,
+        )
+        table.add_column("Task ID", justify="left", style="cyan", no_wrap=True)
+        table.add_column("Repository", justify="left", style="magenta")
+        table.add_column("Turns", justify="right")
+        table.add_column("Feature Cost", justify="right", style="green")
+        table.add_column("Rework Cost", justify="right", style="yellow")
+        table.add_column("Side Cost", justify="right", style="blue")
+        table.add_column("Rework Ratio", justify="right")
+
+        instances: Dict[str, TrajectoryEvaluationResult] = {}
+        for r in results:
+            instances.setdefault(r.instance_id, r)
+
+        for inst_id, r in instances.items():
+            ratio = r.rework_ratio_pct
+            ratio_color = "red" if ratio >= 60 else "yellow" if ratio >= 40 else "green"
+            table.add_row(
+                inst_id,
+                r.repo,
+                str(r.total_turns),
+                f"${r.feature_cost:.6f}",
+                f"${r.rework_cost:.6f}",
+                f"${r.side_cost:.6f}",
+                f"[{ratio_color}]{ratio:.1f}%[/]",
+            )
+        return table
+
 
 def main():
     parser = argparse.ArgumentParser(description="Evaluate Feature-Attempt Hierarchy on SWE-bench trajectories.")
@@ -447,16 +544,13 @@ def main():
         res = evaluator.evaluate_trajectory(traj, budgets=budgets)
         all_results.extend(res)
 
-    print("=" * 80)
-    print("TABLE 1: CONTEXT RETENTION & COMPRESSION PERFORMANCE (SWE-bench)")
-    print("=" * 80)
-    md_table = evaluator.format_markdown_table(all_results)
-    print(md_table)
-    print("\n" + "=" * 80)
-    print("TABLE 2: TOKEN ECONOMICS FINOPS LEDGER (Kotari, 2026)")
-    print("=" * 80)
-    finops_table = evaluator.format_finops_ledger_table(all_results)
-    print(finops_table)
+    console = Console()
+    console.print()
+    console.rule("[bold cyan]TABLE 1 \u00b7 Context Retention & Compression (SWE-bench)[/]")
+    console.print(evaluator.build_retention_table(all_results))
+    console.print()
+    console.rule("[bold green]TABLE 2 \u00b7 Token Economics FinOps Ledger (Kotari, 2026)[/]")
+    console.print(evaluator.build_finops_table(all_results))
 
     latex_table = evaluator.format_latex_table(all_results)
 
