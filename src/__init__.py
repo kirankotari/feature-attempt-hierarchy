@@ -18,7 +18,7 @@ from .tokenizers import (
     TiktokenTokenizer,
 )
 from .hierarchy import HierarchyBuilder
-from .selectors import (
+from .context_selectors import (
     BaseSelector,
     FeatureAttemptSelector,
     SuffixWindowSelector,

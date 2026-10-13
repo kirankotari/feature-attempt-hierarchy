@@ -15,13 +15,13 @@ try:
     from .models import Event, EventKind, TokenUsage
     from .tokenizers import BaseTokenizer, RegexProxyTokenizer, TiktokenTokenizer
     from .hierarchy import HierarchyBuilder
-    from .selectors import FeatureAttemptSelector, SelectionResult
+    from .context_selectors import FeatureAttemptSelector, SelectionResult
     from .ledger import CostLedger, CostLedgerReport
 except (ImportError, ValueError):
     from models import Event, EventKind, TokenUsage
     from tokenizers import BaseTokenizer, RegexProxyTokenizer, TiktokenTokenizer
     from hierarchy import HierarchyBuilder
-    from selectors import FeatureAttemptSelector, SelectionResult
+    from context_selectors import FeatureAttemptSelector, SelectionResult
     from ledger import CostLedger, CostLedgerReport
 
 

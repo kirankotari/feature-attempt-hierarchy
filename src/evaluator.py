@@ -5,11 +5,11 @@ from typing import List, Dict, Set, Optional, Any
 try:
     from .models import Event
     from .tokenizers import BaseTokenizer, RegexProxyTokenizer
-    from .selectors import BaseSelector, SelectionResult
+    from .context_selectors import BaseSelector, SelectionResult
 except (ImportError, ValueError):
     from models import Event
     from tokenizers import BaseTokenizer, RegexProxyTokenizer
-    from selectors import BaseSelector, SelectionResult
+    from context_selectors import BaseSelector, SelectionResult
 
 
 @dataclass

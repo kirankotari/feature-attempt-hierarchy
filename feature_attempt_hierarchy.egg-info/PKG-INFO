@@ -12,10 +12,10 @@ Requires-Python: <3.13,>=3.10
 Description-Content-Type: text/markdown
 Requires-Dist: tiktoken>=0.5.0
 Requires-Dist: rich>=13.0
-Provides-Extra: swebench
-Requires-Dist: datasets; extra == "swebench"
 Provides-Extra: dev
-Requires-Dist: pytest>=8.0; extra == "dev"
+Requires-Dist: pytest>=7.0.0; extra == "dev"
+Provides-Extra: swebench
+Requires-Dist: datasets>=2.14.0; extra == "swebench"
 
 # Feature-Attempt Hierarchies for Coding-Agent Context
 
@@ -51,7 +51,7 @@ feature-attempt-hierarchy/
 │   ├── models.py             # Event, AttemptNode, HierarchyTree, TokenUsage
 │   ├── tokenizers.py         # Pluggable tokenizers (TiktokenTokenizer, RegexProxyTokenizer)
 │   ├── hierarchy.py          # HierarchyBuilder implementing BuildHierarchy(H)
-│   ├── selectors.py          # Algorithm 1 (FeatureAttemptSelector) & Baselines
+│   ├── context_selectors.py          # Algorithm 1 (FeatureAttemptSelector) & Baselines
 │   ├── ledger.py             # CostLedger Token Economics attribution engine
 │   ├── evaluator.py          # ContextGateChecker and benchmark harnesses
 │   └── swebench_adapter.py   # Online runtime adapter for SWE-bench & SWE-agent

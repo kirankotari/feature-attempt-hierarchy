@@ -41,7 +41,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "src"
 from models import Event, EventKind, TokenUsage
 from tokenizers import BaseTokenizer, RegexProxyTokenizer, TiktokenTokenizer
 from hierarchy import HierarchyBuilder
-from selectors import (
+from context_selectors import (
     FeatureAttemptSelector,
     SuffixWindowSelector,
     LatestErrorSelector,

@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../s
 from models import Event, EventKind, TokenUsage
 from tokenizers import RegexProxyTokenizer
 from hierarchy import HierarchyBuilder
-from selectors import FeatureAttemptSelector
+from context_selectors import FeatureAttemptSelector
 from ledger import CostLedger
 
 

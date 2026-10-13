@@ -6,7 +6,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../s
 
 from models import Event, EventKind, TokenUsage
 from tokenizers import RegexProxyTokenizer, WhitespaceTokenizer
-from selectors import FeatureAttemptSelector, SuffixWindowSelector, LatestErrorSelector
+from context_selectors import FeatureAttemptSelector, SuffixWindowSelector, LatestErrorSelector
 
 
 class TestComprehensiveHierarchy(unittest.TestCase):

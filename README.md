@@ -32,7 +32,7 @@ feature-attempt-hierarchy/
 │   ├── models.py             # Event, AttemptNode, HierarchyTree, TokenUsage
 │   ├── tokenizers.py         # Pluggable tokenizers (TiktokenTokenizer, RegexProxyTokenizer)
 │   ├── hierarchy.py          # HierarchyBuilder implementing BuildHierarchy(H)
-│   ├── selectors.py          # Algorithm 1 (FeatureAttemptSelector) & Baselines
+│   ├── context_selectors.py          # Algorithm 1 (FeatureAttemptSelector) & Baselines
 │   ├── ledger.py             # CostLedger Token Economics attribution engine
 │   ├── evaluator.py          # ContextGateChecker and benchmark harnesses
 │   └── swebench_adapter.py   # Online runtime adapter for SWE-bench & SWE-agent

@@ -2,7 +2,7 @@ tiktoken>=0.5.0
 rich>=13.0
 
 [dev]
-pytest>=8.0
+pytest>=7.0.0
 
 [swebench]
-datasets
+datasets>=2.14.0

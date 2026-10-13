@@ -307,12 +307,12 @@ swebench = [
 
 [package.metadata]
 requires-dist = [
-    { name = "datasets", marker = "extra == 'swebench'" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
+    { name = "datasets", marker = "extra == 'swebench'", specifier = ">=2.14.0" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=7.0.0" },
     { name = "rich", specifier = ">=13.0" },
     { name = "tiktoken", specifier = ">=0.5.0" },
 ]
-provides-extras = ["swebench", "dev"]
+provides-extras = ["dev", "swebench"]
 
 [[package]]
 name = "filelock"

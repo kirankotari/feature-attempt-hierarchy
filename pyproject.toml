@@ -24,11 +24,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-swebench = [
-    "datasets",
-]
 dev = [
-    "pytest>=8.0",
+    "pytest>=7.0.0",
+]
+swebench = [
+    "datasets>=2.14.0",
 ]
 
 [tool.setuptools.packages.find]
