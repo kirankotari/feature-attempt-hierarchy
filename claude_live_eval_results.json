@@ -1,0 +1,56 @@
+[
+  {
+    "instance_id": "django__django-11099",
+    "repo": "django/django",
+    "sliding": {
+      "input_tokens": 169,
+      "output_tokens": 200,
+      "latency_sec": 3.18,
+      "identified_root_cause": true,
+      "sample_response": "# Root Cause\nThe original regex patterns used `^` and `$` anchors, which in Python's `re` module match at line boundaries (before/after newlines) when `re.MULTILINE` flag is set. T..."
+    },
+    "hierarchy": {
+      "input_tokens": 206,
+      "output_tokens": 251,
+      "latency_sec": 2.88,
+      "identified_root_cause": true,
+      "sample_response": "# Root Cause\nThe test expects trailing newlines to be **accepted** (`self.assertTrue(validator('valid_user\\n'))`), but changing from `^` and `$` to `\\A` and `\\Z` makes the regex st..."
+    }
+  },
+  {
+    "instance_id": "sympy__sympy-13840",
+    "repo": "sympy/sympy",
+    "sliding": {
+      "input_tokens": 220,
+      "output_tokens": 166,
+      "latency_sec": 2.35,
+      "identified_root_cause": false,
+      "sample_response": "**Root Cause:**\nThe original `Max.eval()` attempted to use `Symbol` objects as dictionary keys (via a typecheck), but `Symbol` objects are unhashable and cannot be used in hash-bas..."
+    },
+    "hierarchy": {
+      "input_tokens": 69,
+      "output_tokens": 377,
+      "latency_sec": 4.16,
+      "identified_root_cause": true,
+      "sample_response": "# Root Cause\n\nWhen `Max(x, y)` is called with unconstrained symbols, SymPy attempts to compare them using `x > y` to determine which is larger. However, this creates a `Relational`..."
+    }
+  },
+  {
+    "instance_id": "flask__flask-2045",
+    "repo": "pallets/flask",
+    "sliding": {
+      "input_tokens": 209,
+      "output_tokens": 105,
+      "latency_sec": 1.71,
+      "identified_root_cause": true,
+      "sample_response": "**Root Cause:** The `url_rule_class` keyword argument was not being captured and passed through the deferred callback function when adding routes to a blueprint. This caused the cu..."
+    },
+    "hierarchy": {
+      "input_tokens": 176,
+      "output_tokens": 235,
+      "latency_sec": 2.85,
+      "identified_root_cause": true,
+      "sample_response": "# Root Cause\n\nWhen a Blueprint defers URL rule registration (via `add_url_rule`), it stores the rule parameters in a callback. However, when the deferred callback is later executed..."
+    }
+  }
+]

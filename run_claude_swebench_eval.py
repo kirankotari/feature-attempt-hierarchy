@@ -26,9 +26,14 @@ from models import EventKind
 from evaluate_swebench import create_synthetic_swebench_trajectories
 
 # Model resolution supporting your environment variables
-MODEL_FAST = os.getenv("CCAF_MODEL_FAST", "claude-3-5-haiku-20241022")
-MODEL_BALANCED = os.getenv("CCAF_MODEL_BALANCED", "claude-3-5-sonnet-20241022")
-MODEL_PREMIUM = os.getenv("CCAF_MODEL_PREMIUM", "claude-3-opus-20240229")
+MODEL_FAST = os.getenv("CCAF_MODEL_FAST", "claude-haiku-4-5")
+MODEL_BALANCED = os.getenv("CCAF_MODEL_BALANCED", "claude-sonnet-5")
+MODEL_PREMIUM = os.getenv("CCAF_MODEL_PREMIUM", "claude-opus-5-5")
+
+
+def _response_text(resp) -> str:
+    """Join text blocks only; responses may lead with thinking blocks."""
+    return "".join(b.text for b in resp.content if b.type == "text").strip()
 
 
 class ClaudeSWEBenchBenchmark:
@@ -39,7 +44,13 @@ class ClaudeSWEBenchBenchmark:
             print("Set it in your terminal: export ANTHROPIC_API_KEY='your-key'")
             sys.exit(1)
 
-        self.client = anthropic.Anthropic(api_key=api_key)
+        # self.client = anthropic.Anthropic(api_key=api_key)
+        base_url = os.getenv("ANTHROPIC_BASE_URL")
+        if base_url:
+            self.client = anthropic.Anthropic(api_key=api_key, base_url=base_url)
+        else:
+            self.client = anthropic.Anthropic(api_key=api_key)
+
         self.model = model_name
         self.budget = token_budget
         self.context_manager = SWEBenchContextManager(token_budget=token_budget)
@@ -99,7 +110,7 @@ class ClaudeSWEBenchBenchmark:
 
         tokens_sliding_in = resp_sliding.usage.input_tokens
         tokens_sliding_out = resp_sliding.usage.output_tokens
-        text_sliding = resp_sliding.content[0].text.strip() if resp_sliding.content else ""
+        text_sliding = _response_text(resp_sliding)
 
         # -------------------------------------------------------------
         # Strategy B: Feature-Attempt Hierarchy (Algorithm 1 - Proposed)
@@ -119,7 +130,7 @@ class ClaudeSWEBenchBenchmark:
 
         tokens_hier_in = resp_hierarchy.usage.input_tokens
         tokens_hier_out = resp_hierarchy.usage.output_tokens
-        text_hier = resp_hierarchy.content[0].text.strip() if resp_hierarchy.content else ""
+        text_hier = _response_text(resp_hierarchy)
 
         # Check if Claude correctly identified the root issue
         prob_stmt_keywords = task["problem_statement"].lower().split()[:3]
@@ -154,8 +165,15 @@ def main():
         default="balanced",
         help="Model tier: fast (Haiku), balanced (Sonnet), premium (Opus)"
     )
+    parser.add_argument(
+        "--model",
+        type=str,
+        default=None,
+        help="Explicit model name (e.g. claude-3-5-sonnet-latest, claude-3-haiku-20240307). Overrides --model_tier."
+    )
     parser.add_argument("--budget", type=int, default=1500, help="Token budget per prompt.")
     args = parser.parse_args()
+ 
 
     # Map tier to actual model name
     tier_map = {
@@ -163,7 +181,8 @@ def main():
         "balanced": MODEL_BALANCED,
         "premium": MODEL_PREMIUM
     }
-    chosen_model = tier_map[args.model_tier]
+    # chosen_model = tier_map[args.model_tier]
+    chosen_model = args.model if args.model else tier_map[args.model_tier]
 
     print("=" * 70)
     print("LIVE CLAUDE EVALUATION: SLIDING WINDOW VS. FEATURE-ATTEMPT HIERARCHY")
